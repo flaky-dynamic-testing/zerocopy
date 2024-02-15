@@ -497,11 +497,6 @@ fn derive_from_bytes_struct(ast: &DeriveInput, strct: &DataStruct) -> proc_macro
 //   this would require ~4 billion enum variants, which obviously isn't a thing.
 
 fn derive_from_bytes_enum(ast: &DeriveInput, enm: &DataEnum) -> proc_macro2::TokenStream {
-    if !enm.is_fieldless() {
-        return Error::new_spanned(ast, "only field-less enums can implement FromBytes")
-            .to_compile_error();
-    }
-
     let reprs = try_or_print!(ENUM_FROM_BYTES_CFG.validate_reprs(ast));
 
     let variants_required = match reprs.as_slice() {
@@ -728,11 +723,6 @@ const STRUCT_UNION_UNALIGNED_CFG: Config<StructRepr> = Config {
 // - `repr(u8)` or `repr(i8)`
 
 fn derive_unaligned_enum(ast: &DeriveInput, enm: &DataEnum) -> proc_macro2::TokenStream {
-    if !enm.is_fieldless() {
-        return Error::new_spanned(ast, "only field-less enums can implement Unaligned")
-            .to_compile_error();
-    }
-
     // The only valid reprs are `u8` and `i8`, and optionally `align(1)`. We
     // don't actually care what the reprs are so long as they satisfy that
     // requirement.
@@ -755,9 +745,10 @@ const ENUM_UNALIGNED_CFG: Config<EnumRepr> = {
         allowed_combinations: &[
             &[U8],
             &[I8],
+            &[C, U8],
+            &[C, I8],
         ],
         disallowed_but_legal_combinations: &[
-            &[C],
             &[U16],
             &[U32],
             &[U64],
@@ -766,6 +757,15 @@ const ENUM_UNALIGNED_CFG: Config<EnumRepr> = {
             &[I32],
             &[I64],
             &[Isize],
+            &[C],
+            &[C, U16],
+            &[C, U32],
+            &[C, U64],
+            &[C, Usize],
+            &[C, I16],
+            &[C, I32],
+            &[C, I64],
+            &[C, Isize],
         ],
     }
 };
