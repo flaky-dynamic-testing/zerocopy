@@ -431,33 +431,28 @@ fn derive_from_zeros_struct(ast: &DeriveInput, strct: &DataStruct) -> proc_macro
 }
 
 // An enum is `FromZeros` if:
-// - all of its variants are fieldless
 // - one of the variants has a discriminant of `0`
+// - that discriminant's fields all implement `FromZeros`
 
 fn derive_from_zeros_enum(ast: &DeriveInput, enm: &DataEnum) -> proc_macro2::TokenStream {
-    if !enm.is_fieldless() {
-        return Error::new_spanned(ast, "only field-less enums can implement FromZeros")
-            .to_compile_error();
-    }
-
     // We don't actually care what the repr is; we just care that it's one of
     // the allowed ones.
     try_or_print!(ENUM_FROM_ZEROS_AS_BYTES_CFG.validate_reprs(ast));
 
-    let has_explicit_zero_discriminant =
-        enm.variants.iter().filter_map(|v| v.discriminant.as_ref()).any(|(_, e)| {
-            if let Expr::Lit(ExprLit { lit: Lit::Int(i), .. }) = e {
-                i.base10_parse::<usize>().ok() == Some(0)
-            } else {
-                false
+    let explicit_zero_variant = enm.variants.iter().position(|v| {
+        if let Some((_, Expr::Lit(ExprLit { lit: Lit::Int(i), .. }))) = v.discriminant.as_ref() {
+            if i.base10_parse::<usize>().ok() == Some(0) {
+                return true;
             }
-        });
+        }
+        false
+    });
     // If the first variant of an enum does not specify its discriminant, it is set to zero:
-    // https://doc.rust-lang.org/reference/items/enumerations.html#custom-discriminant-values-for-fieldless-enumerations
+    // https://doc.rust-lang.org/reference/items/enumerations.html#implicit-discriminants
     let has_implicit_zero_discriminant =
         enm.variants.iter().next().map(|v| v.discriminant.is_none()) == Some(true);
 
-    if !has_explicit_zero_discriminant && !has_implicit_zero_discriminant {
+    if !explicit_zero_variant.is_some() && !has_implicit_zero_discriminant {
         return Error::new_spanned(
             ast,
             "FromZeros only supported on enums with a variant that has a discriminant of `0`",
@@ -465,7 +460,17 @@ fn derive_from_zeros_enum(ast: &DeriveInput, enm: &DataEnum) -> proc_macro2::Tok
         .to_compile_error();
     }
 
-    impl_block(ast, enm, Trait::FromZeros, FieldBounds::ALL_SELF, false, None, None)
+    let zero_variant = enm.variants.iter().nth(explicit_zero_variant.unwrap_or(0)).unwrap();
+    let explicit_bounds = zero_variant
+        .fields
+        .iter()
+        .map(|field| {
+            let ty = &field.ty;
+            parse_quote! { #ty: ::zerocopy::FromZeros }
+        })
+        .collect::<Vec<WherePredicate>>();
+
+    impl_block(ast, enm, Trait::FromZeros, FieldBounds::Explicit(explicit_bounds), false, None, None)
 }
 
 // Like structs, unions are `FromZeros` if
@@ -835,11 +840,11 @@ enum TraitBound {
     Other(Trait),
 }
 
-#[derive(Debug, Eq, PartialEq)]
 enum FieldBounds<'a> {
     None,
     All(&'a [TraitBound]),
     Trailing(&'a [TraitBound]),
+    Explicit(Vec<WherePredicate>),
 }
 
 impl<'a> FieldBounds<'a> {
@@ -962,6 +967,7 @@ fn impl_block_with_context<D: DataExt>(
         (FieldBounds::Trailing(traits), [.., last]) => {
             vec![bound_tt(last.1, normalize_bounds(trt, traits))]
         }
+        (FieldBounds::Explicit(bounds), _) => bounds,
     };
 
     // Don't bother emitting a padding check if there are no fields.
