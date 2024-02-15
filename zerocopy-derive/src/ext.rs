@@ -111,13 +111,3 @@ fn map_fields<'a>(
         })
         .collect()
 }
-
-pub trait EnumExt {
-    fn is_fieldless(&self) -> bool;
-}
-
-impl EnumExt for DataEnum {
-    fn is_fieldless(&self) -> bool {
-        self.fields().is_empty()
-    }
-}

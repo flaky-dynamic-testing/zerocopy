@@ -470,7 +470,15 @@ fn derive_from_zeros_enum(ast: &DeriveInput, enm: &DataEnum) -> proc_macro2::Tok
         })
         .collect::<Vec<WherePredicate>>();
 
-    impl_block(ast, enm, Trait::FromZeros, FieldBounds::Explicit(explicit_bounds), false, None, None)
+    impl_block(
+        ast,
+        enm,
+        Trait::FromZeros,
+        FieldBounds::Explicit(explicit_bounds),
+        false,
+        None,
+        None,
+    )
 }
 
 // Like structs, unions are `FromZeros` if
