@@ -158,4 +158,6 @@ fn test_has_fields() {
     const SIZE: usize = core::mem::size_of::<HasFields>();
     let bytes: [u8; SIZE] = zerocopy::transmute!(HasFields::B(10));
     assert_eq!(HasFields::try_read_from(&bytes[..]), Some(HasFields::B(10)));
+    let bytes: [u8; SIZE] = zerocopy::transmute!(HasFields::C { foo: 10 });
+    assert_eq!(HasFields::try_read_from(&bytes[..]), Some(HasFields::C { foo: 10 }));
 }
