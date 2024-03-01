@@ -900,6 +900,7 @@ mod _transitions {
 /// Casts of the referent type.
 mod _casts {
     use super::*;
+    use crate::PointerMetadata;
 
     impl<'a, T, I> Ptr<'a, T, I>
     where
@@ -1156,6 +1157,7 @@ mod _casts {
             // produces a pointer whose address is greater than or equal to that of
             // `ptr`. Since `ptr` is a `NonNull`, `base` is also non-null.
             let base = unsafe { NonNull::new_unchecked(base) };
+            let elems = <U as KnownLayout>::PointerMetadata::from_elem_count(elems);
             let ptr = U::raw_from_ptr_len(base, elems);
 
             // SAFETY:
