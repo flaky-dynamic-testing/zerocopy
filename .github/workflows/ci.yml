@@ -1,10 +1,6 @@
 name: Build & Tests
 
-on:
-  pull_request:
-  push:
-    branches:
-  merge_group:
+on: push
 
 permissions: read-all
 
